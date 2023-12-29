@@ -46,16 +46,25 @@ int main(void) {
 
 	// Triangle vertices
 	float vertices[] = {
-		-0.5f, -0.5f, 0.0f,
-		 0.5f, -0.5f, 0.0f,
-		 0.0f,  0.5f, 0.0f
+	 0.5f,  0.5f, 0.0f,  // top right
+	 0.5f, -0.5f, 0.0f,  // bottom right
+	-0.5f, -0.5f, 0.0f,  // bottom left
+	-0.5f,  0.5f, 0.0f   // top left 
 	};
 
+	// Indices for the EBO
+	unsigned int indices[] = {  // note that we start from 0!
+		0, 1, 3,   // first triangle
+		1, 2, 3    // second triangle
+	};
+
+	// Element buffer object
+	unsigned int EBO;
+	glGenBuffers(1, &EBO);
+	
 	unsigned int VBO;  // Vertex buffer object
 	glGenBuffers(1, &VBO); // Generate a buffer object
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);	// Bind the buffer object to the GL_ARRAY_BUFFER target
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW); // Copy the vertices data into the buffer's memory
-
+	
 	// Vertex shader and Fragment shader
 	unsigned int vertexShader = loadShaderSource("./assets/vertex_core.glsl");
 	unsigned int fragmentShader = loadShaderSource("./assets/fragment_core.glsl");
@@ -96,14 +105,18 @@ int main(void) {
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
+	// Copy the indices array into an element buffer for OpenGL to use
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
 	// Set the vertex attributes pointers
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 
 	// Setting up the different modes of rendering
-	unsigned int modes[] = { GL_TRIANGLES, GL_POINTS, GL_LINES};
+	unsigned int modes[] = {GL_FILL, GL_POINT, GL_LINE};
 	size_t modesNumber = sizeof(modes) / sizeof(modes[0]);
-	int mode_oscilator = 0;
+	int modeOscilator = 0;
 
 	// Delay for input processing
 	double lastPressTime = 0.0;
@@ -111,16 +124,25 @@ int main(void) {
 	
 	// Main while loop
 	while (!glfwWindowShouldClose(window)) { // Checks if the window has been instructed to close
-		mode_oscilator = processInput(window, mode_oscilator, lastPressTime, delay); // Checks if the escape key is pressed
+		modeOscilator = processInput(window, modeOscilator, lastPressTime, delay);
+
+		// Modular arithmetic so we have the correct index even if the modeOscilator is negative
+		while (modeOscilator < 0) {
+			modeOscilator += modesNumber;
+		}
 
 		// Rendering commands here
 		glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
+		// Set the mode
+		glPolygonMode(GL_FRONT_AND_BACK, modes[modeOscilator % modesNumber]);
+
 		// Call the shader program
 		glUseProgram(shaderProgram);
 		glBindVertexArray(VAO);
-		glDrawArrays(modes[mode_oscilator % modesNumber], 0, 3);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		glBindVertexArray(0);
 
 		// Check the events and swap the buffers
 		glfwSwapBuffers(window); // Swaps the color buffer (whatever is being drawn) to the front
@@ -143,6 +165,13 @@ int processInput(GLFWwindow* window, int modeOscillator, double& lastPressTime, 
 		double currentTime = glfwGetTime();
 		if (currentTime - lastPressTime > delay) {
 			modeOscillator++;
+			lastPressTime = currentTime;
+		}
+	}
+	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+		double currentTime = glfwGetTime();
+		if (currentTime - lastPressTime > delay) {
+			modeOscillator--;
 			lastPressTime = currentTime;
 		}
 	}
