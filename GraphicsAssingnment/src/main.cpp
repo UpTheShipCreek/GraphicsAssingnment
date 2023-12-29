@@ -46,16 +46,17 @@ int main(void) {
 
 	// Triangle vertices
 	float vertices[] = {
-	 0.5f,  0.5f, 0.0f,  // top right
-	 0.5f, -0.5f, 0.0f,  // bottom right
-	-0.5f, -0.5f, 0.0f,  // bottom left
-	-0.5f,  0.5f, 0.0f   // top left 
+	   -0.5f, 0.0f, 0.0f,  // A 
+		0.0f, 0.0f, 0.0f,  // B
+		0.0f, 0.5f, 0.0f,  // C
+		0.5f, 0.0f, 0.0f,  // D
+		0.5f, 0.5f, 0.0f,  // E
 	};
 
 	// Indices for the EBO
 	unsigned int indices[] = {  // note that we start from 0!
-		0, 1, 3,   // first triangle
-		1, 2, 3    // second triangle
+		0, 1, 2,   // first triangle
+		1, 3, 4    //	 second triangle
 	};
 
 	// Element buffer object
