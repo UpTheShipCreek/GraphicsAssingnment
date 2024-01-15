@@ -71,8 +71,8 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(SolutionDir)\Linking\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
-    <LibraryPath>$(SolutionDir)\Linking\lib;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+    <IncludePath>.\include;$(SolutionDir)\Linking\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <LibraryPath>.\lib;$(SolutionDir)\Linking\lib;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -132,7 +132,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="lib\shader.cpp" />
     <ClCompile Include="lib\stb.cpp" />
+    <ClCompile Include="lib\texture.cpp" />
+    <ClCompile Include="lib\window.cpp" />
     <ClCompile Include="src\glad.c" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
@@ -140,6 +143,15 @@
     <None Include="assets\fragment_core.glsl" />
     <None Include="assets\vertex_core.glsl" />
     <None Include="glfw3.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\shader.h" />
+    <ClInclude Include="include\texture.h" />
+    <ClInclude Include="include\window.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="assets\textures\b_prisoner.jpg" />
+    <Image Include="assets\textures\themediterranean.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
