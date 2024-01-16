@@ -9,14 +9,160 @@
 #include <sstream>
 #include <streambuf>
 #include <string>
+#include <map>
+#include <vector>
 
 #include "shader.h"
 #include "stb/stb_image.h"
 #include "window.h"
 #include "texture.h"
 
-void processInput(GLFWwindow* window, glm::vec3& translation, float& angle, int& modeOscillator, double& lastPressTime, double delay);
-void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+class KeyInput {
+
+	enum KeyState : std::uint8_t {
+		KEY_UP,
+		KEY_DOWN,
+		KEY_HOLD
+	};
+
+	bool _isEnabled = true;
+	std::map<int, KeyState> _keys;
+	GLFWwindow* _window;
+
+	void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+
+		std::map<int, KeyState>::iterator it = _keys.find(key);
+		if (it == _keys.end()) return;
+
+		switch (action) {
+			case GLFW_PRESS:
+				_keys[key] = KEY_DOWN;
+				break;
+			case GLFW_REPEAT:
+				_keys[key] = KEY_HOLD;
+				break;
+			case GLFW_RELEASE:
+				_keys[key] = KEY_UP;
+				break;
+			default: 
+				_keys[key] = KEY_UP; // Just in case? I hope this is not a bug let's see
+				break;
+		}
+	}
+	
+	public:
+	KeyInput(GLFWwindow* window, std::vector<int> keysToMonitor) {
+		_window = window;
+		for (int key : keysToMonitor) {
+			_keys[key] = KEY_UP;
+		}
+	}
+	~KeyInput(){}
+
+	bool is_enabled() {
+		return _isEnabled;
+	}
+
+	void enable() {
+		_isEnabled = true;
+	}
+
+	void disable() {
+		_isEnabled = false;
+	}
+
+	bool key_pressed(int key) {
+		if (!_isEnabled) return false;
+
+		std::map<int, KeyState>::iterator it = _keys.find(key);
+
+		if (it != _keys.end()) {
+			if (_keys[key] == KEY_DOWN) return true;
+			else return false;
+		}
+	}
+	bool key_held(int key) {
+		if (!_isEnabled) return false;
+
+		std::map<int, KeyState>::iterator it = _keys.find(key);
+
+		if (it != _keys.end()) {
+			if (_keys[key] == KEY_HOLD) return true;
+			else return false;
+		}
+	}
+};
+
+class MouseInput {
+	bool firstMouse = true;
+	float yaw = -90.0f;	// yaw is initialized to -90.0 degrees since a yaw of 0.0 results in a direction vector pointing to the right so we initially rotate a bit to the left.
+	float pitch = 0.0f;
+	float lastX = 800.0f / 2.0;
+	float lastY = 600.0 / 2.0;
+	float fov = 45.0f;
+};
+
+class Camera {
+	/*glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+	glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+	glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);*/
+
+	glm::vec3 _position;
+	glm::vec3 _front;
+	glm::vec3 _up;
+	
+	public:
+	Camera(glm::vec3 position, glm::vec3 front, glm::vec3 up) {
+		_position = position;
+		_front = front;
+		_up = up;
+	}
+
+	glm::vec3 get_position() {
+		return _position;
+	}
+	glm::vec3 get_front() {
+		return _front;
+	}
+	glm::vec3 get_up() {
+		return _up;
+	}
+
+	void update_position(glm::vec3 position) {
+		_position = position;
+	}
+	void update_front(glm::vec3 front) {
+		_front = front;
+	}
+	void update_up(glm::vec3 up) {
+		_up = up;
+	}
+};
+
+class Movement {
+	float _speed;
+	Camera& _camera;
+	KeyInput& _keyInput;
+
+	public:
+	Movement(float speed, Camera& camera, KeyInput& keyInput) : _speed(speed), _camera(camera), _keyInput(keyInput) {
+	}
+
+	void update() {
+		if (_keyInput.key_held(GLFW_KEY_W)) {
+			_camera.update_position(_camera.get_position() + _camera.get_front() * _speed);
+		}
+		if (_keyInput.key_held(GLFW_KEY_S)) {
+			_camera.update_position(_camera.get_position() - _camera.get_front() * _speed);
+		}
+		if (_keyInput.key_held(GLFW_KEY_A)) {
+			_camera.update_position(_camera.get_position() - glm::normalize(glm::cross(_camera.get_front(), _camera.get_up())) * _speed);
+		}
+		if (_keyInput.key_held(GLFW_KEY_D)) {
+			_camera.update_position(_camera.get_position() + glm::normalize(glm::cross(_camera.get_front(), _camera.get_up())) * _speed);
+		}
+	}
+};
 
 // camera
 glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
@@ -39,125 +185,16 @@ int main(void) {
 	GLFWwindow* window = windowInitializations(800, 600, "Graphics Assignment");
 
 	glfwSetCursorPosCallback(window, mouse_callback);
-	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-	// Triangle vertices
-	float vertices[] = {
-	-0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-	 0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-	 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-	 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-	-0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-	-0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-
-	-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-	 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-	 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-	 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-	-0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-	-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-
-	-0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-	-0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-	-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-	-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-	-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-	-0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-
-	 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-	 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-	 0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-	 0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-	 0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-	 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-
-	-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-	 0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
-	 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-	 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-	-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-	-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-
-	-0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-	 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-	 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-	 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-	-0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-	-0.5f,  0.5f, -0.5f,  0.0f, 1.0f
-	};
-
-
-	glm::vec3 cubePositions[] = {
-		glm::vec3(0.0f,  0.0f,  0.0f),
-		glm::vec3(2.0f,  5.0f, -15.0f),
-		glm::vec3(-1.5f, -2.2f, -2.5f),
-		glm::vec3(-3.8f, -2.0f, -12.3f),
-		glm::vec3(2.4f, -0.4f, -3.5f),
-		glm::vec3(-1.7f,  3.0f, -7.5f),
-		glm::vec3(1.3f, -2.0f, -2.5f),
-		glm::vec3(1.5f,  2.0f, -2.5f),
-		glm::vec3(1.5f,  0.2f, -1.5f),
-		glm::vec3(-1.3f,  1.0f, -1.5f)
-	};
-
-	// Model matrix
-	glm::mat4 model = glm::mat4(1.0f);
-	model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-
-	// Projection matrix
-	glm::mat4 projection;
-	projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-
-	// Element buffer object
-	unsigned int EBO;
-	glGenBuffers(1, &EBO);
-	
-	unsigned int VBO;  // Vertex buffer object
-	glGenBuffers(1, &VBO); // Generate a buffer object
-
-	// Vertex array object
-	unsigned int VAO;
-	glGenVertexArrays(1, &VAO);
-	glBindVertexArray(VAO);
-
-	// Copy the vertices array into a buffer for OpenGL to use
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-	// Position Attribute
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-
-	// Texture Attribute
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-	glEnableVertexAttribArray(2);
-
-	Shader shader("./assets/vertex_core.glsl", "./assets/fragment_core.glsl");
-
-	// Load textures
-	unsigned int texture1 = loadTexture("./assets/textures/b_prisoner.jpg");
-	unsigned int texture2 = loadTexture("./assets/textures/themediterranean.png");
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 
 	// Delay for input processing
 	double lastPressTime = 0.0;
 	double delay = 0.2;
 
-	// Setting up the different modes of rendering
-	unsigned int modes[] = {GL_FILL, GL_LINE};
-	int modesNumber = sizeof(modes) / sizeof(modes[0]);
-	int modeOscillator = 0;
-
-	// Transformation matrix for our shaders
-	glm::mat4 trans = glm::mat4(1.0f);
-	float angle = 0.0;
-	glm::vec3 translation = glm::vec3(0.0f, 0.0f, -3.0f);
-
-	// Z-buffer
-	glEnable(GL_DEPTH_TEST);
 	
 	// Main while loop
 	while (!glfwWindowShouldClose(window)) { // Checks if the window has been instructed to close
-		processInput(window, translation, angle, modeOscillator, lastPressTime, delay);
+		processInput(window, translation, lastPressTime, delay);
 
 		// Modular arithmetic so we have the correct index even if the modeOscillator is negative
 		while (modeOscillator < 0) {
@@ -232,90 +269,18 @@ void processInput(GLFWwindow* window, glm::vec3& translation, float& angle, int&
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, true);
 	}
-
-	// Change rendering modes
+	// Left/Right
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-		double currentTime = glfwGetTime();
-		if (currentTime - lastPressTime > delay) {
-			modeOscillator++;
-			lastPressTime = currentTime;
-		}
+		translation += glm::vec3(-0.1, 0.0, 0.0);
 	}
 	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-		double currentTime = glfwGetTime();
-		if (currentTime - lastPressTime > delay) {
-			modeOscillator--;
-			lastPressTime = currentTime;
-		}
+		translation += glm::vec3(0.1, 0.0, 0.0);
 	}
-
-	// Object movement
-	if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-		if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
-			angle -= 5.0f;
-		}
-		if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
-			angle += 5.0f;
-		}
+	// Forward/Backward
+	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+		translation += glm::vec3(0.0, 0.0, 0.1);
 	}
-	// Camera movement
-	else {
-		// Up/Down
-		if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
-			translation += glm::vec3(0.0, -0.1, 0.0);
-		}
-		if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
-			translation += glm::vec3(0.0, 0.1, 0.0);
-		}
-		// Left/Right
-		if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
-			translation += glm::vec3(-0.1, 0.0, 0.0);
-		}
-		if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
-			translation += glm::vec3(0.1, 0.0, 0.0);
-		}
-		// Forward/Backward
-		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-			translation += glm::vec3(0.0, 0.0, 0.1);
-		}
-		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-			translation += glm::vec3(0.0, 0.0, -0.1);
-		}
+	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+		translation += glm::vec3(0.0, 0.0, -0.1);
 	}
-}
-
-void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
-	float xpos = static_cast<float>(xposIn);
-	float ypos = static_cast<float>(yposIn);
-
-	if (firstMouse)
-	{
-		lastX = xpos;
-		lastY = ypos;
-		firstMouse = false;
-	}
-
-	float xoffset = xpos - lastX;
-	float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
-	lastX = xpos;
-	lastY = ypos;
-
-	float sensitivity = 0.1f; // change this value to your liking
-	xoffset *= sensitivity;
-	yoffset *= sensitivity;
-
-	yaw += xoffset;
-	pitch += yoffset;
-
-	// make sure that when pitch is out of bounds, screen doesn't get flipped
-	if (pitch > 89.0f)
-		pitch = 89.0f;
-	if (pitch < -89.0f)
-		pitch = -89.0f;
-
-	glm::vec3 front;
-	front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-	front.y = sin(glm::radians(pitch));
-	front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-	cameraFront = glm::normalize(front);
 }
