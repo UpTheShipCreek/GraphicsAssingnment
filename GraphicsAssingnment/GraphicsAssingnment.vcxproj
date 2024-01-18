@@ -132,7 +132,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="lib\shader.cpp" />
     <ClCompile Include="lib\stb.cpp" />
     <ClCompile Include="lib\texture.cpp" />
     <ClCompile Include="lib\window.cpp" />
@@ -145,6 +144,7 @@
     <None Include="glfw3.dll" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\camera.h" />
     <ClInclude Include="include\shader.h" />
     <ClInclude Include="include\texture.h" />
     <ClInclude Include="include\window.h" />
