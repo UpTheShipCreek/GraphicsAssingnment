@@ -1,10 +1,14 @@
-#include <iostream>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+
+#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <streambuf>
@@ -110,8 +114,8 @@ void processInput(GLFWwindow* window, glm::vec3& playerPosition, glm::vec3& play
 
 int main(void) {
 
-	glm::vec3 playerPosition = { 0.0f, 0.0f, 1.0f };
-	glm::vec3 playerEulers = { 0.0f, 90.0f,0.0f };
+	glm::vec3 playerPosition = { 1.0f, 0.0f, 0.0f };
+	glm::vec3 playerEulers = { 0.0f, 90.0f, 0.0f };
 
 	int width = 800;
 	int height = 600;
@@ -120,105 +124,74 @@ int main(void) {
 	GLFWwindow* window = windowInitializations(width, height, "Graphics Assignment");
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 
-	float vertices[] = {
-		-0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-		 0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-		 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-		 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-		-0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-		-0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
 
-		-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-		 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-		 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-		 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-		-0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-		-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+	Assimp::Importer importer;
+	const aiScene* scene = importer.ReadFile("./assets/objects/Earth.obj", aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenSmoothNormals);
 
-		-0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-		-0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-		-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-		-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-		-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-		-0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+	aiMesh* mesh = scene->mMeshes[0];
 
-		 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-		 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-		 0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-		 0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-		 0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-		 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+	// Get the number of triangles (faces)
+	unsigned int numFaces = mesh->mNumFaces;
 
-		-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-		 0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
-		 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-		 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-		-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-		-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+	// The total number of vertices will be numFaces * 3 (assuming each face is a triangle)
+	unsigned int numVertices = numFaces * 3;
 
-		-0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-		 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-		 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-		 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-		-0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-		-0.5f,  0.5f, -0.5f,  0.0f, 1.0f
-	};
 
-	glm::vec3 cubePositions[] = {
-		glm::vec3(0.0f,  0.0f,  0.0f),
-		glm::vec3(2.0f,  5.0f, -15.0f),
-		glm::vec3(-1.5f, -2.2f, -2.5f),
-		glm::vec3(-3.8f, -2.0f, -12.3f),
-		glm::vec3(2.4f, -0.4f, -3.5f),
-		glm::vec3(-1.7f,  3.0f, -7.5f),
-		glm::vec3(1.3f, -2.0f, -2.5f),
-		glm::vec3(1.5f,  2.0f, -2.5f),
-		glm::vec3(1.5f,  0.2f, -1.5f),
-		glm::vec3(-1.3f,  1.0f, -1.5f)
-	};
+	aiVector3D* vertices = mesh->mVertices;
+	aiVector3D* normals = mesh->mNormals;
+	aiVector3D* texCoords = mesh->mTextureCoords[0];
 
 	// Model matrix
 	glm::mat4 model = glm::mat4(1.0f);
-	model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+	// model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 
 	// Projection matrix
 	glm::mat4 projection;
 	projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
 
-	// Element buffer object
-	unsigned int EBO;
-	glGenBuffers(1, &EBO);
+	// unsigned int VBO;  // Vertex buffer object
+	// glGenBuffers(1, &VBO); // Generate a buffer object
 
-	unsigned int VBO;  // Vertex buffer object
-	glGenBuffers(1, &VBO); // Generate a buffer object
+	// Vertex buffer objects
+	unsigned int VBO[3]; // One for each array
+	glGenBuffers(3, VBO);
 
 	// Vertex array object
 	unsigned int VAO;
 	glGenVertexArrays(1, &VAO);
 	glBindVertexArray(VAO);
 
-	// Copy the vertices array into a buffer for OpenGL to use
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
 	// Position Attribute
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+	// 0: Attribute location 
+	// 3: Number of components per vertex attribute
+	// GL_FLOAT: Type of data
+	// GL_FALSE: Data is not normalized
+	// 5 * sizeof(float): Stride (space between consecutive vertex attributes)
+	// (void*)0: Offset of where the position data begins in the buffer
+
+	// Copy the vertices array into a buffer for OpenGL to use
+	glBindBuffer(GL_ARRAY_BUFFER, VBO[0]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(aiVector3D) * mesh->mNumVertices, vertices, GL_STATIC_DRAW);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 
-	// Texture Attribute
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	// Copy the normals array into a buffer for OpenGL to use
+	glBindBuffer(GL_ARRAY_BUFFER, VBO[1]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(aiVector3D) * mesh->mNumVertices, normals, GL_STATIC_DRAW);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(1);
+
+	// Copy the texture coordinates array into a buffer for OpenGL to use
+	glBindBuffer(GL_ARRAY_BUFFER, VBO[2]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(aiVector3D) * mesh->mNumVertices, texCoords, GL_STATIC_DRAW);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(2);
 
 	Shader shader("./assets/vertex_core.glsl", "./assets/fragment_core.glsl");
 
 	// Load textures
-	unsigned int texture1 = loadTexture("./assets/textures/b_prisoner.jpg");
-	unsigned int texture2 = loadTexture("./assets/textures/themediterranean.png");
-
-	// Transformation matrix for our shaders
-	glm::mat4 trans = glm::mat4(1.0f);
-	float angle = 0.0;
-	glm::vec3 translation = glm::vec3(0.0f, 0.0f, -3.0f);
+	unsigned int texture1 = loadTexture("./assets/textures/Clouds_2K.png");
+	unsigned int texture2 = loadTexture("./assets/textures/Diffuse_2K.png");
 
 	// Z-buffer
 	glEnable(GL_DEPTH_TEST);
@@ -252,7 +225,7 @@ int main(void) {
 		glm::vec3 right{ glm::cross(forwards, globalUp) };
 		glm::vec3 up{ glm::cross(right,forwards) };
 		glm::mat4 view = glm::lookAt(playerPosition, playerPosition + forwards, up);
-		shader.setMat4("view", view);	
+		shader.setMat4("view", view);
 		glUniformMatrix4fv(glGetUniformLocation(shader.ID, "view"), 1, GL_FALSE, glm::value_ptr(view));
 
 		int projectionLoc = glGetUniformLocation(shader.ID, "projection");
@@ -275,15 +248,14 @@ int main(void) {
 
 		// Draw the triangle
 		glBindVertexArray(VAO);
-		for (unsigned int i = 0; i < 10; i++) {
-			glm::mat4 model = glm::mat4(1.0f);
-			model = glm::translate(model, cubePositions[i]);
-			float angle = 20.0f * i;
-			model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-			shader.setMat4("model", model);
 
-			glDrawArrays(GL_TRIANGLES, 0, 36);
-		}
+		shader.setMat4("model", model);
+		// GL_TRIANGLES: Draw mode i.e. draw the vertices as triangles
+		// 0: Starting index in the enabled arrays
+		// 36 : Number of indices to be rendered (3 is a triangle, 6 is a square, 36 is a cube)
+		glDrawArrays(GL_TRIANGLES, 0, numVertices);
+	
+		
 		glBindVertexArray(0);
 
 		// Check the events and swap the buffers
