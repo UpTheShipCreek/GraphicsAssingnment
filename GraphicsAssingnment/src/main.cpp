@@ -64,8 +64,21 @@ int main()
 
     // load models
     // -----------
-    std::string path = "./assets/objects/earth/Earth.obj";
-    Model ourModel(path);
+    std::string sunPath = "./assets/objects/sun/scene.gltf";
+    std::string moonPath = "./assets/objects/moon/Moon.obj";
+    std::string earthPath = "./assets/objects/earth/Earth.obj";
+
+    Model sun(sunPath);
+    Model moon(moonPath);
+    Model earth(earthPath);
+
+    std::vector<Model> models = { sun, earth, moon };
+
+    glm::vec3 modelPositions[] = {
+        glm::vec3(0.0f, 0.0f, 0.0f),
+        glm::vec3(5.0f, 0.0f, 5.0f),
+        glm::vec3(-5.0f, 0.0f, -5.0f)
+    };
 
     // render loop
     // -----------
@@ -96,11 +109,13 @@ int main()
         ourShader.setMat4("view", view);
 
         // render the loaded model
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
-        model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));	// it's a bit too big for our scene, so scale it down
-        ourShader.setMat4("model", model);
-        ourModel.Draw(ourShader);
+        for (int i = 0; i < (int)models.size(); i++) {
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, modelPositions[i]); // translate it down so it's at the center of the scene
+            model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));	// it's a bit too big for our scene, so scale it down
+            ourShader.setMat4("model", model);
+			models[i].Draw(ourShader);
+		}
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
