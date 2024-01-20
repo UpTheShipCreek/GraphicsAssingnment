@@ -45,6 +45,17 @@ float lastFrame = 0.0f;
 // lighting
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
+enum PlanetType{
+    EARTH=0, MOON, SUN
+};
+
+struct Object {
+    Model model;
+    glm::vec3 position;
+    glm::vec3 scale;
+    PlanetType type;
+};
+
 int main()
 {
     GLFWwindow* window = windowInitializations(SCR_WIDTH, SCR_HEIGHT, "Graphics Assignment");
@@ -68,17 +79,26 @@ int main()
     std::string moonPath = "./assets/objects/moon/Moon.obj";
     std::string earthPath = "./assets/objects/earth/Earth.obj";
 
-    Model sun(sunPath);
-    Model moon(moonPath);
-    Model earth(earthPath);
+    Model sunModel(sunPath);
+    Model moonModel(moonPath);
+    Model earthModel(earthPath);
 
-    std::vector<Model> models = { sun, earth, moon };
+    // Test
+    float earthOrbitRadius = 5.0f;  // adjust based on your scene setup
+    float earthOrbitalPeriod = 10.0f;
 
-    glm::vec3 modelPositions[] = {
-        glm::vec3(0.0f, 0.0f, 0.0f),
-        glm::vec3(5.0f, 0.0f, 5.0f),
-        glm::vec3(-5.0f, 0.0f, -5.0f)
-    };
+    // Positions 
+    glm::vec3 sunPosition = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 moonPosition = glm::vec3(-50.0f, 0.0f, 5.0f);
+    glm::vec3 earthPosition = glm::vec3(-47.0f, 0.0f, 5.0f);
+
+
+    // Create objects that handle the model, position, scale and the movement
+    Object sun = { sunModel, sunPosition, glm::vec3(30.0), SUN };
+    Object moon = { moonModel, moonPosition, glm::vec3(0.1), MOON };
+    Object earth = { earthModel, earthPosition, glm::vec3(0.5), EARTH};
+
+    std::vector<Object> objects = { sun, earth, moon };
 
     // render loop
     // -----------
@@ -109,12 +129,40 @@ int main()
         ourShader.setMat4("view", view);
 
         // render the loaded model
-        for (int i = 0; i < (int)models.size(); i++) {
+        for (int i = 0; i < (int)objects.size(); i++) {
             glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, modelPositions[i]); // translate it down so it's at the center of the scene
-            model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));	// it's a bit too big for our scene, so scale it down
+         
+            if (objects[i].type == MOON) {
+                // 1. Rotate around its own axis (spin)
+                model = glm::rotate(model, (float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
+
+                // 2. Translate to its orbit around the sun
+                model = glm::translate(model, glm::vec3(50, 0.0f, 0.0f));
+
+                // 3. Rotate around the sun
+                model = glm::rotate(model, 2 * (float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
+
+                // 4. Translate to its orbit around the earth
+                model = glm::translate(model, glm::vec3(3, 0.0f, 5.0f));
+
+                // 5. Rotate around the earth
+                model = glm::rotate(model,  2 *(float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
+            }
+            else if (objects[i].type == EARTH) {
+                // 1. Rotate around its own axis (spin)
+                model = glm::rotate(model, (float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
+
+                // 2. Translate to its orbit around the sun
+                model = glm::translate(model, glm::vec3(47, 0.0f, 0.0f));
+
+                // 3. Rotate around the sun
+                model = glm::rotate(model, (float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
+            }
+             // translate it down so it's at the center of the scene
+            model = glm::scale(model, objects[i].scale);	// it's a bit too big for our scene, so scale it down
+
             ourShader.setMat4("model", model);
-			models[i].Draw(ourShader);
+			objects[i].model.Draw(ourShader);
 		}
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
