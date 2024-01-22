@@ -24,16 +24,18 @@
 #include "model.h"
 
 
+#define SIMULATION_SPEED 4.0f
+
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-void processInput(GLFWwindow* window);
+void processInput(GLFWwindow* window, bool& motion, double& motionStartTime, double& motionStopTime, double& lastPressTime, double delay);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
 // camera
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera camera(glm::vec3(40.0f, 0.0f, 50.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -89,8 +91,8 @@ int main()
 
     // Positions 
     glm::vec3 sunPosition = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 moonPosition = glm::vec3(-50.0f, 0.0f, 5.0f);
-    glm::vec3 earthPosition = glm::vec3(-47.0f, 0.0f, 5.0f);
+    glm::vec3 moonPosition = glm::vec3(0.0f, 0.0f, 5.0f);
+    glm::vec3 earthPosition = glm::vec3(0.0f, 0.0f, 5.0f);
 
 
     // Create objects that handle the model, position, scale and the movement
@@ -99,6 +101,24 @@ int main()
     Object earth = { earthModel, earthPosition, glm::vec3(0.5), EARTH};
 
     std::vector<Object> objects = { sun, earth, moon };
+
+
+    bool motion = true;
+    double lastPressTime = 0.0;
+    double delay = 0.2;
+
+    double motionStartTime = (double)glfwGetTime();
+    double motionStopTime = (double)glfwGetTime();
+    float elapsedTime;
+
+    // Earth's orbit parametric formula
+    // vec3 position = (r cos(w t), r sin(w t), 0) 
+    // where r is the radius of the orbit, w is the angular speed, and t is the time
+
+    // Initialize positions
+    glm::mat4 sunFramePosition = glm::translate(glm::mat4(1.0f), sunPosition);
+    glm::mat4 earthFramePosition = glm::translate(glm::mat4(1.0f), earthPosition);
+    glm::mat4 moonFramePosition = glm::translate(glm::mat4(1.0f), moonPosition);
 
     // render loop
     // -----------
@@ -112,7 +132,7 @@ int main()
 
         // input
         // -----
-        processInput(window);
+        processInput(window, motion, motionStartTime, motionStopTime, lastPressTime, delay);
 
         // render
         // ------
@@ -131,36 +151,62 @@ int main()
         // render the loaded model
         for (int i = 0; i < (int)objects.size(); i++) {
             glm::mat4 model = glm::mat4(1.0f);
-         
-            if (objects[i].type == MOON) {
-                // 1. Rotate around its own axis (spin)
-                model = glm::rotate(model, (float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
+            
+            if (motion == true) {
+                elapsedTime = currentFrame - (motionStartTime - motionStopTime);
 
-                // 2. Translate to its orbit around the sun
-                model = glm::translate(model, glm::vec3(50, 0.0f, 0.0f));
+                elapsedTime *= SIMULATION_SPEED;
 
-                // 3. Rotate around the sun
-                model = glm::rotate(model, 2 * (float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
+                if (objects[i].type == MOON) {
+                    // Rotate around the sun (20 days to complete one spin around the sun)
+                    model = glm::rotate(model, elapsedTime/20, glm::vec3(0.0f, 1.0f, 0.0f));
+                    // Translate to its orbit around the sun
+                    model = glm::translate(model, glm::vec3(47, 0.0f, 0.0f));
 
-                // 4. Translate to its orbit around the earth
-                model = glm::translate(model, glm::vec3(3, 0.0f, 5.0f));
+                    // Rotate around the Earth (27 days to complete one spin around the Earth)
+                    model = glm::rotate(model, elapsedTime/27, glm::vec3(0.0f, 1.0f, 0.0f));
+                    // Translate to its orbit around the Earth
+                    model = glm::translate(model, glm::vec3(3.0f, 0.0f, 0.0f));
 
-                // 5. Rotate around the earth
-                model = glm::rotate(model,  2 *(float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
+                    // Rotate around itself (4 days to complete one spin around itself)
+                    model = glm::rotate(model, elapsedTime/4, glm::vec3(0.0f, 1.0f, 0.0f));
+
+                    moonFramePosition = model;
+                }
+                else if (objects[i].type == EARTH) {
+                    if (motion == true) {
+
+                        // 1. Rotate around the sun (20 days to complete one spin around the sun)
+                        model = glm::rotate(model, elapsedTime/20, glm::vec3(0.0f, 1.0f, 0.0f));
+
+                        // 2. Translate to its orbit around the sun
+                        model = glm::translate(model, glm::vec3(47, 0.0f, 0.0f));
+
+                        // 3. Rotate around its own axis (spin)
+                        model = glm::rotate(model, elapsedTime, glm::vec3(0.0f, 1.0f, 0.0f));
+
+                        // Save the position
+                        earthFramePosition = model;
+                    }
+                }
+                else if (objects[i].type == SUN) {
+                    model = glm::rotate(model, elapsedTime/100, glm::vec3(0.0f, 1.0f, 0.0f));
+                    sunFramePosition = model;
+                }
             }
-            else if (objects[i].type == EARTH) {
-                // 1. Rotate around its own axis (spin)
-                model = glm::rotate(model, (float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
-
-                // 2. Translate to its orbit around the sun
-                model = glm::translate(model, glm::vec3(47, 0.0f, 0.0f));
-
-                // 3. Rotate around the sun
-                model = glm::rotate(model, (float)glfwGetTime(), glm::vec3(0.0f, 1.0f, 0.0f));
+            else {
+                if (objects[i].type == MOON) {
+                    model = moonFramePosition;
+                }
+                else if (objects[i].type == EARTH) {
+                    model = earthFramePosition;
+                }
+                else if (objects[i].type == SUN) {
+                    model = sunFramePosition;
+                }
             }
-             // translate it down so it's at the center of the scene
-            model = glm::scale(model, objects[i].scale);	// it's a bit too big for our scene, so scale it down
-
+  
+            model = glm::scale(model, objects[i].scale);
             ourShader.setMat4("model", model);
 			objects[i].model.Draw(ourShader);
 		}
@@ -179,10 +225,25 @@ int main()
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow* window)
+void processInput(GLFWwindow* window, bool& motion, double& motionStartTime, double& motionStopTime, double& lastPressTime, double delay)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+        double currentTime = glfwGetTime();
+        if (currentTime - lastPressTime > delay) {
+            if (motion == true) {
+                motion = false;
+                motionStopTime = currentTime;
+            }
+            else {
+                motion = true;
+                motionStartTime = currentTime;
+            }
+            lastPressTime = currentTime;
+        }
+    }
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         camera.ProcessKeyboard(FORWARD, deltaTime);
