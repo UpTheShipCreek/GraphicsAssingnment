@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/random.hpp>
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -25,6 +26,7 @@
 
 
 #define SIMULATION_SPEED 4.0f
+#define NUMBER_OF_STARS 1000
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
@@ -87,13 +89,75 @@ int main()
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
 
-    
     // build and compile our shader zprogram
     // ------------------------------------
     Shader nonLuminousShader("./assets/shaders/vertex_nonluminous.glsl", "./assets/shaders/fragment_nonluminous.glsl");
     Shader sunShader("./assets/shaders/vertex_luminous.glsl", "./assets/shaders/fragment_luminous.glsl");
-    
+    Shader starShader("./assets/shaders/vertex_backdrop.glsl", "./assets/shaders/fragment_backdrop.glsl");
 
+    // Little cube for a star
+    float vertices[] = {
+        // positions        
+        -0.5f, -0.5f, -0.5f, 
+         0.5f, -0.5f, -0.5f, 
+         0.5f,  0.5f, -0.5f, 
+         0.5f,  0.5f, -0.5f, 
+        -0.5f,  0.5f, -0.5f, 
+        -0.5f, -0.5f, -0.5f, 
+
+        -0.5f, -0.5f,  0.5f, 
+         0.5f, -0.5f,  0.5f, 
+         0.5f,  0.5f,  0.5f, 
+         0.5f,  0.5f,  0.5f, 
+        -0.5f,  0.5f,  0.5f, 
+        -0.5f, -0.5f,  0.5f, 
+
+        -0.5f,  0.5f,  0.5f, 
+        -0.5f,  0.5f, -0.5f, 
+        -0.5f, -0.5f, -0.5f, 
+        -0.5f, -0.5f, -0.5f, 
+        -0.5f, -0.5f,  0.5f, 
+        -0.5f,  0.5f,  0.5f, 
+
+         0.5f,  0.5f,  0.5f, 
+         0.5f,  0.5f, -0.5f, 
+         0.5f, -0.5f, -0.5f, 
+         0.5f, -0.5f, -0.5f, 
+         0.5f, -0.5f,  0.5f, 
+         0.5f,  0.5f,  0.5f, 
+
+        -0.5f, -0.5f, -0.5f, 
+         0.5f, -0.5f, -0.5f, 
+         0.5f, -0.5f,  0.5f, 
+         0.5f, -0.5f,  0.5f, 
+        -0.5f, -0.5f,  0.5f, 
+        -0.5f, -0.5f, -0.5f, 
+
+        -0.5f,  0.5f, -0.5f, 
+         0.5f,  0.5f, -0.5f, 
+         0.5f,  0.5f,  0.5f, 
+         0.5f,  0.5f,  0.5f, 
+        -0.5f,  0.5f,  0.5f, 
+        -0.5f,  0.5f, -0.5f, 
+    };
+
+    std::vector<glm::vec3> starPositions;
+    for (int i = 0; i < 1000; ++i) {
+        glm::vec3 randomPosition = glm::sphericalRand(500.0f);  // Adjust the radius as needed
+        starPositions.push_back(randomPosition);
+    }
+
+    unsigned int starVAO, starVBO;
+    glGenVertexArrays(1, &starVAO);
+    glGenBuffers(1, &starVBO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, starVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glBindVertexArray(starVAO);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    
     // load models
     // -----------
     std::string sunPath = "./assets/objects/sun/scene.gltf";
@@ -110,8 +174,8 @@ int main()
 
     // Positions 
     glm::vec3 sunPosition = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 moonPosition = glm::vec3(0.0f, 0.0f, 5.0f);
-    glm::vec3 earthPosition = glm::vec3(0.0f, 0.0f, 5.0f);
+    glm::vec3 moonPosition = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 earthPosition = glm::vec3(0.0f, 0.0f, 0.0f);
 
     // Create the transformations
     // Rotation we the period of 100, which is really slow 
@@ -185,7 +249,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // view/projection transformations
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 10000.0f);
         glm::mat4 view = camera.GetViewMatrix();
 
         for (auto& object : objects) {
@@ -197,7 +261,7 @@ int main()
             object.shader.setVec3("light.position", sunPosition);
             object.shader.setVec3("viewPos", camera.Position);
             object.shader.setVec3("light.ambient", 0.3f, 0.3f, 0.3f);
-            object.shader.setVec3("light.diffuse", 0.7f, 0.7f, 0.7f);
+            object.shader.setVec3("light.diffuse", 0.8f, 0.8f, 0.8f);
 
             glm::mat4 model = glm::mat4(1.0f);
             if (motion == true) {
@@ -216,6 +280,18 @@ int main()
             object.shader.setMat4("model", model);
             object.model.Draw(object.shader);
         }
+
+        glBindVertexArray(starVAO);
+        starShader.use();
+        starShader.setMat4("projection", projection);
+        starShader.setMat4("view", view);
+        for (auto& position : starPositions) {
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, position);
+            starShader.setMat4("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+        glBindVertexArray(0);
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
