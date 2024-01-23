@@ -28,7 +28,7 @@
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-void processInput(GLFWwindow* window, bool& motion, double& motionStartTime, double& motionStopTime, double& lastPressTime, double delay);
+void processInput(GLFWwindow* window, bool& motion, float& motionStartTime, float& motionStopTime, float& lastPressTime, float delay);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -90,8 +90,9 @@ int main()
     
     // build and compile our shader zprogram
     // ------------------------------------
-    Shader nonLuminousShader("./assets/vertex_model.glsl", "./assets/fragment_model.glsl");
-    Shader sunShader("./assets/vertex_light.glsl", "./assets/fragment_light.glsl");
+    Shader nonLuminousShader("./assets/shaders/vertex_nonluminous.glsl", "./assets/shaders/fragment_nonluminous.glsl");
+    Shader sunShader("./assets/shaders/vertex_luminous.glsl", "./assets/shaders/fragment_luminous.glsl");
+    
 
     // load models
     // -----------
@@ -131,7 +132,7 @@ int main()
     // Create objects that handle the model, scale and the movement
     Object sun = { 
         sunModel, // Model
-        glm::vec3(30.0), // Scaling
+        glm::vec3(30.0f), // Scaling
         {sunSpin}, //Transformations
         sunShader, // Shader
         sunFramePosition // Frame position
@@ -139,14 +140,14 @@ int main()
 
     Object earth = { 
         earthModel, 
-        glm::vec3(0.5), 
+        glm::vec3(0.5f), 
         {earthSunRotation, earthSpin}, 
         nonLuminousShader, 
         earthFramePosition
     };
     Object moon = { 
         moonModel, 
-        glm::vec3(0.1), 
+        glm::vec3(0.1f), 
         {moonSunRotation, moonEarthRotation, moonSpin},  
         nonLuminousShader, 
         moonFramePosition
@@ -157,11 +158,11 @@ int main()
 
     // Various variables for the simulation
     bool motion = true;
-    double lastPressTime = 0.0;
-    double delay = 0.2;
+    float lastPressTime = 0.0f;
+    float delay = 0.2f;
 
-    double motionStartTime = (double)glfwGetTime();
-    double motionStopTime = (double)glfwGetTime();
+    float motionStartTime = static_cast<float>(glfwGetTime());
+    float motionStopTime = static_cast<float>(glfwGetTime());
     float elapsedTime;
 
     // render loop
@@ -195,8 +196,8 @@ int main()
 
             object.shader.setVec3("light.position", sunPosition);
             object.shader.setVec3("viewPos", camera.Position);
-            object.shader.setVec3("light.ambient", 0.2f, 0.2f, 0.2f);
-            object.shader.setVec3("light.diffuse", 0.5f, 0.5f, 0.5f);
+            object.shader.setVec3("light.ambient", 0.3f, 0.3f, 0.3f);
+            object.shader.setVec3("light.diffuse", 0.7f, 0.7f, 0.7f);
 
             glm::mat4 model = glm::mat4(1.0f);
             if (motion == true) {
@@ -229,13 +230,13 @@ int main()
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow* window, bool& motion, double& motionStartTime, double& motionStopTime, double& lastPressTime, double delay)
+void processInput(GLFWwindow* window, bool& motion, float& motionStartTime, float& motionStopTime, float& lastPressTime, float delay)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-        double currentTime = glfwGetTime();
+        float currentTime = static_cast<float>(glfwGetTime());
         if (currentTime - lastPressTime > delay) {
             if (motion == true) {
                 motion = false;

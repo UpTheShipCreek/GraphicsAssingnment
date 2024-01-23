@@ -7,10 +7,8 @@ in vec2 TexCoords;
 
 struct Light {
     vec3 position;
-
     vec3 ambient;
     vec3 diffuse;
-    vec3 specular;
 };
 
 uniform sampler2D texture_diffuse1;

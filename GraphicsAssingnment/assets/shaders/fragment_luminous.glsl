@@ -15,7 +15,7 @@ uniform Light light;
 
 void main()
 {    
-    vec3 ambient = 0.8 * vec3(1.0, 1.0, 1.0);
+    vec3 ambient = 1 * vec3(1.0, 1.0, 1.0);
     vec3 objectColor = texture(texture_diffuse1,  TexCoords).rgb;
     vec3 result = objectColor * ambient;
 
