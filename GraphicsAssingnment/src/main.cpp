@@ -51,11 +51,29 @@ enum PlanetType{
     EARTH=0, MOON, SUN
 };
 
+// A class that will allow us to create a template for the transformations of each planet
+class Transformation {
+    float _radius;
+    float _period;
+
+    public:
+    Transformation(float radius, float period) {
+        _radius = radius;
+        _period = period;
+    }
+    glm::mat4 use(glm::mat4 model, float time) {
+        model = glm::rotate(model, time / _period, glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::translate(model, glm::vec3(_radius, 0.0f, 0.0f));
+        return model;
+    }
+};
+
 struct Object {
     Model model;
-    glm::vec3 position;
     glm::vec3 scale;
-    PlanetType type;
+    std::vector<std::shared_ptr<Transformation>> transformations;
+    Shader shader;
+    glm::mat4 framePosition;
 };
 
 int main()
@@ -69,11 +87,11 @@ int main()
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
 
-    Shader ourShader("./assets/vertex_model.glsl", "./assets/fragment_model.glsl");
+    
     // build and compile our shader zprogram
     // ------------------------------------
-    Shader lightingShader("./assets/vertex_core.glsl", "./assets/fragment_core.glsl");
-    Shader lightCubeShader("./assets/vertex_light.glsl", "./assets/fragment_light.glsl");
+    Shader nonLuminousShader("./assets/vertex_model.glsl", "./assets/fragment_model.glsl");
+    Shader sunShader("./assets/vertex_light.glsl", "./assets/fragment_light.glsl");
 
     // load models
     // -----------
@@ -94,15 +112,50 @@ int main()
     glm::vec3 moonPosition = glm::vec3(0.0f, 0.0f, 5.0f);
     glm::vec3 earthPosition = glm::vec3(0.0f, 0.0f, 5.0f);
 
+    // Create the transformations
+    // Rotation we the period of 100, which is really slow 
+    std::shared_ptr<Transformation> sunSpin = std::make_shared<Transformation>(0.0f, 100.0f);
+    // Rotation around the sun
+    std::shared_ptr<Transformation> earthSunRotation = std::make_shared<Transformation>(47.0f, 20.0f);
+    std::shared_ptr<Transformation> earthSpin = std::make_shared<Transformation>(0.0f, 1.0f);
+    // Rotation around the sun
+    std::shared_ptr<Transformation> moonSunRotation = std::make_shared<Transformation>(47.0f, 20.0f);
+    std::shared_ptr<Transformation> moonEarthRotation= std::make_shared<Transformation>(3.0f, 3.0f);
+    std::shared_ptr<Transformation> moonSpin = std::make_shared<Transformation>(0.0f, 4.0f);
 
-    // Create objects that handle the model, position, scale and the movement
-    Object sun = { sunModel, sunPosition, glm::vec3(30.0), SUN };
-    Object moon = { moonModel, moonPosition, glm::vec3(0.1), MOON };
-    Object earth = { earthModel, earthPosition, glm::vec3(0.5), EARTH};
+    // Initialize positions
+    glm::mat4 sunFramePosition = glm::translate(glm::mat4(1.0f), sunPosition);
+    glm::mat4 earthFramePosition = glm::translate(glm::mat4(1.0f), earthPosition);
+    glm::mat4 moonFramePosition = glm::translate(glm::mat4(1.0f), moonPosition);
 
+    // Create objects that handle the model, scale and the movement
+    Object sun = { 
+        sunModel, // Model
+        glm::vec3(30.0), // Scaling
+        {sunSpin}, //Transformations
+        sunShader, // Shader
+        sunFramePosition // Frame position
+    };
+
+    Object earth = { 
+        earthModel, 
+        glm::vec3(0.5), 
+        {earthSunRotation, earthSpin}, 
+        nonLuminousShader, 
+        earthFramePosition
+    };
+    Object moon = { 
+        moonModel, 
+        glm::vec3(0.1), 
+        {moonSunRotation, moonEarthRotation, moonSpin},  
+        nonLuminousShader, 
+        moonFramePosition
+    };
+
+    // Create a vector of objects
     std::vector<Object> objects = { sun, earth, moon };
 
-
+    // Various variables for the simulation
     bool motion = true;
     double lastPressTime = 0.0;
     double delay = 0.2;
@@ -110,15 +163,6 @@ int main()
     double motionStartTime = (double)glfwGetTime();
     double motionStopTime = (double)glfwGetTime();
     float elapsedTime;
-
-    // Earth's orbit parametric formula
-    // vec3 position = (r cos(w t), r sin(w t), 0) 
-    // where r is the radius of the orbit, w is the angular speed, and t is the time
-
-    // Initialize positions
-    glm::mat4 sunFramePosition = glm::translate(glm::mat4(1.0f), sunPosition);
-    glm::mat4 earthFramePosition = glm::translate(glm::mat4(1.0f), earthPosition);
-    glm::mat4 moonFramePosition = glm::translate(glm::mat4(1.0f), moonPosition);
 
     // render loop
     // -----------
@@ -139,82 +183,42 @@ int main()
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // don't forget to enable shader before setting uniforms
-        ourShader.use();
-
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
-        ourShader.setMat4("projection", projection);
-        ourShader.setMat4("view", view);
 
-        // render the loaded model
-        for (int i = 0; i < (int)objects.size(); i++) {
+        for (auto& object : objects) {
+            object.shader.use();
+
+            object.shader.setMat4("projection", projection);
+            object.shader.setMat4("view", view);
+
+            object.shader.setVec3("light.position", sunPosition);
+            object.shader.setVec3("viewPos", camera.Position);
+            object.shader.setVec3("light.ambient", 0.2f, 0.2f, 0.2f);
+            object.shader.setVec3("light.diffuse", 0.5f, 0.5f, 0.5f);
+
             glm::mat4 model = glm::mat4(1.0f);
-            
             if (motion == true) {
                 elapsedTime = currentFrame - (motionStartTime - motionStopTime);
-
                 elapsedTime *= SIMULATION_SPEED;
 
-                if (objects[i].type == MOON) {
-                    // Rotate around the sun (20 days to complete one spin around the sun)
-                    model = glm::rotate(model, elapsedTime/20, glm::vec3(0.0f, 1.0f, 0.0f));
-                    // Translate to its orbit around the sun
-                    model = glm::translate(model, glm::vec3(47, 0.0f, 0.0f));
-
-                    // Rotate around the Earth (27 days to complete one spin around the Earth)
-                    model = glm::rotate(model, elapsedTime/27, glm::vec3(0.0f, 1.0f, 0.0f));
-                    // Translate to its orbit around the Earth
-                    model = glm::translate(model, glm::vec3(3.0f, 0.0f, 0.0f));
-
-                    // Rotate around itself (4 days to complete one spin around itself)
-                    model = glm::rotate(model, elapsedTime/4, glm::vec3(0.0f, 1.0f, 0.0f));
-
-                    moonFramePosition = model;
-                }
-                else if (objects[i].type == EARTH) {
-                    if (motion == true) {
-
-                        // 1. Rotate around the sun (20 days to complete one spin around the sun)
-                        model = glm::rotate(model, elapsedTime/20, glm::vec3(0.0f, 1.0f, 0.0f));
-
-                        // 2. Translate to its orbit around the sun
-                        model = glm::translate(model, glm::vec3(47, 0.0f, 0.0f));
-
-                        // 3. Rotate around its own axis (spin)
-                        model = glm::rotate(model, elapsedTime, glm::vec3(0.0f, 1.0f, 0.0f));
-
-                        // Save the position
-                        earthFramePosition = model;
-                    }
-                }
-                else if (objects[i].type == SUN) {
-                    model = glm::rotate(model, elapsedTime/100, glm::vec3(0.0f, 1.0f, 0.0f));
-                    sunFramePosition = model;
-                }
+                for (auto& transformation : object.transformations) {
+					model = transformation->use(model, elapsedTime);
+				}
+                object.framePosition = model;
             }
             else {
-                if (objects[i].type == MOON) {
-                    model = moonFramePosition;
-                }
-                else if (objects[i].type == EARTH) {
-                    model = earthFramePosition;
-                }
-                else if (objects[i].type == SUN) {
-                    model = sunFramePosition;
-                }
+				model = object.framePosition;
             }
-  
-            model = glm::scale(model, objects[i].scale);
-            ourShader.setMat4("model", model);
-			objects[i].model.Draw(ourShader);
-		}
-
+            model = glm::scale(model, object.scale);
+            object.shader.setMat4("model", model);
+            object.model.Draw(object.shader);
+        }
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
-        glfwPollEvents();
+        glfwPollEvents();   
     }
 
     // glfw: terminate, clearing all previously allocated GLFW resources.

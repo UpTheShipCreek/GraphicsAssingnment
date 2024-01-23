@@ -3,7 +3,15 @@ out vec4 FragColor;
 
 in vec2 TexCoords;
 
+struct Light {
+    vec3 position;
+    vec3 ambient;
+    vec3 diffuse;
+};
+
 uniform sampler2D texture_diffuse1;
+uniform vec3 viewPos;
+uniform Light light;
 
 void main()
 {    
